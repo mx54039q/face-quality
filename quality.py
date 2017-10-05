@@ -3,6 +3,7 @@ import cv2
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.colors import Normalize
+from scipy.ndimage import filters
 
 # DCT: sharpness
 def get_dct(img):
@@ -38,39 +39,54 @@ def get_sobel(img):
 
 # Nuclear norm
 def nu_norm(img):
-    return np.linalg.norm(img,ord='nuc')    
-
-imglist = np.loadtxt('probe.txt',dtype='string',delimiter=' ')
-imglist = pd.DataFrame(imglist,columns=['path','ori_pose','ori_ill'])
-gallery = imglist[(imglist.ori_pose=='051') & (imglist.ori_ill=='07')]
-probe = imglist[(imglist.ori_ill!='07') & (imglist.ori_pose!='051')]
-sobel_ccbr,dct_ccbr,norm_ccbr,con_ccbr = [],[],[],[]
-sobel_cpf,dct_cpf,norm_cpf,con_cpf = [],[],[],[]
-for i in range(probe.shape[0]):
-    print i
-    name = probe.iloc[i,0][:-3]
-    img_ccbr = np.float32(cv2.resize(cv2.imread('ccbr_probe/'+name+'jpg',0)[15:165,15:135],(50,54)))
-    img_cpf = np.float32(cv2.imread('cpf_probe/'+name+'bmp',0)[1:55,5:55])
-    sobel_ccbr.append(get_sobel(img_ccbr));sobel_cpf.append(get_sobel(img_cpf))
-    dct_ccbr.append(get_dct(img_ccbr));dct_cpf.append(get_dct(img_cpf))
-    norm_ccbr.append(nu_norm(img_ccbr));norm_cpf.append(nu_norm(img_cpf))
-    con_ccbr.append(his_con(img_ccbr));con_cpf.append(his_con(img_cpf))
-    #plt.imshow(img,cmap ='gray');plt.show()
-
-probe_ccbr = probe.copy()
-probe_ccbr['sobel']= sobel_ccbr
-probe_ccbr['dct']= dct_ccbr
-probe_ccbr['norm']= norm_ccbr
-probe_ccbr['con']= con_ccbr
-probe_ccbr.to_csv('quality_ccbr.csv',index=False)
-
-probe_cpf = probe.copy()
-probe_cpf['sobel']= sobel_cpf
-probe_cpf['dct']= dct_cpf
-probe_cpf['norm']= norm_cpf
-probe_cpf['con']= con_cpf
-probe_cpf.to_csv('quality_cpf.csv',index=False)    
+    return np.linalg.norm(img,ord='nuc')
     
+# Focus Score
+def focus(img):
+    kernel_xx = [[1, -2, 1]]
+    imx = np.zeros(img.shape)
+    filters.convolve(img,kernel_xx,imx)
+    kernel_yy = [[1], [-2], [1]]
+    imy = np.zeros(img.shape)
+    filters.convolve(img,kernel_yy,imy)
+    return np.abs(imx).sum() + np.abs(imy).sum()
+    
+if __name__ == "__main__":
+    imglist = np.loadtxt('probe.txt',dtype='string',delimiter=' ')
+    imglist = pd.DataFrame(imglist,columns=['path','ori_pose','ori_ill'])
+    gallery = imglist[(imglist.ori_pose=='051') & (imglist.ori_ill=='07')]
+    probe = imglist[(imglist.ori_ill!='07') & (imglist.ori_pose!='051')]
+    sobel_ccbr,dct_ccbr,norm_ccbr,con_ccbr, focus_ccbr = [],[],[],[],[]
+    sobel_cpf,dct_cpf,norm_cpf,con_cpf,focus_cpf = [],[],[],[],[]
+    for i in range(probe.shape[0]):
+        print i
+        name = probe.iloc[i,0][:-3]
+        img_ccbr = np.float32(cv2.resize(cv2.imread('ccbr_probe/' +
+            name + 'jpg',0)[15:165,15:135],(50,54)))
+        img_cpf = np.float32(cv2.imread('cpf_probe/' + name + 'bmp',0)[1:55,5:55])
+        sobel_ccbr.append(get_sobel(img_ccbr));sobel_cpf.append(get_sobel(img_cpf))
+        dct_ccbr.append(get_dct(img_ccbr));dct_cpf.append(get_dct(img_cpf))
+        norm_ccbr.append(nu_norm(img_ccbr));norm_cpf.append(nu_norm(img_cpf))
+        con_ccbr.append(his_con(img_ccbr));con_cpf.append(his_con(img_cpf))
+        focus_ccbr.append(focus(img_ccbr));focus_cpf.append(focus(img_cpf))
+        #plt.imshow(img,cmap ='gray');plt.show()
+
+    probe_ccbr = probe.copy()
+    probe_ccbr['sobel']= sobel_ccbr
+    probe_ccbr['dct']= dct_ccbr
+    probe_ccbr['norm']= norm_ccbr
+    probe_ccbr['con']= con_ccbr
+    probe_ccbr['focus']= focus_ccbr
+    probe_ccbr.to_csv('quality_ccbr.csv',index=False)
+
+    probe_cpf = probe.copy()
+    probe_cpf['sobel']= sobel_cpf
+    probe_cpf['dct']= dct_cpf
+    probe_cpf['norm']= norm_cpf
+    probe_cpf['con']= con_cpf
+    probe_cpf['focus']= focus_cpf
+    probe_cpf.to_csv('quality_cpf.csv',index=False)    
+        
     
     
     
